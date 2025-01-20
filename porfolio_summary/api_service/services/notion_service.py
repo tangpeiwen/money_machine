@@ -7,17 +7,18 @@ from api_service.config import settings
 from api_service.utils.logger import logger
 from api_service.services.crypto_service import CryptoService  # 添加这个导入
 
+
 class NotionService:
     def __init__(self):
         self.client = Client(auth=settings.NOTION_TOKEN)
-        self.crypto_service = CryptoService() 
+        self.crypto_service = CryptoService()
 
     async def update_portfolio_prices(self):
         """更新主表中的加密货币价格并返回汇总数据"""
         try:
             query = self.client.databases.query(
                 database_id=settings.NOTION_DATABASE_ID,
-                filter={"property": "资产类型", "select": {"equals": "cryptocurrency"}}
+                filter={"property": "资产类型", "select": {"equals": "cryptocurrency"}},
             )
 
             crypto_summary = {}
@@ -26,15 +27,15 @@ class NotionService:
             for page in query["results"]:
                 result = await self._process_portfolio_item(page)
                 if result:
-                    crypto_summary.update(result['summary'])
-                    asset_types.update(result['asset_types'])
+                    crypto_summary.update(result["summary"])
+                    asset_types.update(result["asset_types"])
 
             return crypto_summary, asset_types
 
         except Exception as e:
             logger.error(f"更新投资组合价格时出错: {e}")
             raise
-    
+
     # async def _process_portfolio_item(self, page):
     #     """处理单个投资组合项目"""
     #     try:
@@ -50,13 +51,13 @@ class NotionService:
     #         crypto_data = await self._get_crypto_data(name, symbol)
     #         if not crypto_data["success"]:
     #             return None
-            
+
     #         # 更新主表
     #         await self._update_notion_page(page["id"], crypto_data)
 
     #         # 准备汇总数据
     #         summary_data = await self._prepare_summary_data(crypto_data, properties)
-            
+
     #         return {
     #             'summary': summary_data,
     #             'asset_types': asset_types
@@ -81,7 +82,7 @@ class NotionService:
             crypto_data = await self._get_crypto_data(name, symbol)
             if not crypto_data["success"]:
                 return None
-            
+
             # 更新主表
             await self._update_notion_page(page["id"], crypto_data)
 
@@ -94,64 +95,62 @@ class NotionService:
             total_value = tokens_holding * current_price
 
             return {
-                'summary': {
+                "summary": {
                     search_key: {  # 使用 search_key 作为键
                         "name": crypto_data["name"],
                         "symbol": crypto_data["symbol"].upper(),
                         "current_price": current_price,
                         "total_tokens": tokens_holding,
                         "total_value": total_value,
-                        "total_cost_basis": cost_basis
+                        "total_cost_basis": cost_basis,
                     }
                 },
-                'asset_types': asset_types
+                "asset_types": asset_types,
             }
 
         except Exception as e:
             logger.error(f"处理投资组合项目时出错: {e}")
             return None
-            
 
     def _extract_asset_type(self, properties):
         """从属性中提取资产类型"""
-        return properties.get('资产类型', {}).get('select', {}).get('name', 'cryptocurrency')
+        return properties.get("资产类型", {}).get("select", {}).get("name", "cryptocurrency")
 
     def _extract_name_symbol(self, properties):
         """从属性中提取名称和符号"""
         name = ""
         symbol = ""
-        
+
         name_data = properties.get("Name", {}).get("title", [])
         if name_data and name_data[0].get("text"):
             name = name_data[0]["text"].get("content", "").strip()
-        
+
         symbol_data = properties.get("Symbol", {}).get("rich_text", [])
         if symbol_data and symbol_data[0].get("text"):
             symbol = symbol_data[0]["text"].get("content", "").strip()
-            
+
         return name, symbol
-    
+
     async def _get_crypto_data(self, name, symbol):
         """获取加密货币数据，尝试多种搜索方式"""
         crypto_data = {"success": False}
-        
+
         if symbol:
             crypto_data = self.crypto_service.get_crypto_price(symbol, "symbol")
-        
+
         if not crypto_data["success"] and name:
             crypto_data = self.crypto_service.get_crypto_price(name, "slug")
-        
+
         if not crypto_data["success"] and name:
             crypto_data = self.crypto_service.get_crypto_price(name, "symbol")
-            
+
         return crypto_data
-    
+
     async def clear_today_history(self, today):
         """清除今天的历史记录"""
         try:
             existing_records = self.client.databases.query(
-                database_id=settings.NOTION_HISTORY_DATABASE_ID,
-                filter={"property": "Date", "date": {"equals": today}}
+                database_id=settings.NOTION_HISTORY_DATABASE_ID, filter={"property": "Date", "date": {"equals": today}}
             )
 
             for record in existing_records["results"]:
@@ -162,7 +161,7 @@ class NotionService:
 
         except Exception as e:
             logger.error(f"删除当天历史记录时出错: {e}")
-    
+
     async def save_portfolio_history(self, crypto_summary, asset_types, today):
         """保存投资组合历史记录"""
         updated_count = 0
@@ -171,7 +170,7 @@ class NotionService:
                 try:
                     # 计算加权平均成本
                     weighted_avg_cost = data["total_cost_basis"] / data["total_tokens"]
-                    
+
                     # 使用对应的资产类型
                     asset_type = asset_types.get(search_key, "cryptocurrency")
 
@@ -199,7 +198,7 @@ class NotionService:
                 except Exception as e:
                     logger.error(f"保存 {search_key} 的汇总数据时出错: {e}")
                     continue
-                    
+
         return updated_count
 
     async def get_portfolio_summary(self) -> dict:
@@ -207,22 +206,21 @@ class NotionService:
         try:
             # 获取当前数据和总值
             current_data = await self._get_current_portfolio_values()
-            
+
             # 获取昨日数据和变化
             yesterday_data = await self._get_yesterday_portfolio_data()
-            
+
             # 计算变化
             changes = self._calculate_portfolio_changes(
-                current_data['total'], 
-                yesterday_data['total'] if yesterday_data else 0
+                current_data["total"], yesterday_data["total"] if yesterday_data else 0
             )
-            
+
             # 准备摘要数据
             summary_data = {
-                "total_value": round(current_data['total'], 2),
+                "total_value": round(current_data["total"], 2),
                 "has_previous_data": bool(yesterday_data),
-                "change_amount": round(changes['amount'], 2) if changes['amount'] is not None else None,
-                "change_percentage": round(changes['percentage'], 3) if changes['percentage'] is not None else None,
+                "change_amount": round(changes["amount"], 2) if changes["amount"] is not None else None,
+                "change_percentage": round(changes["percentage"], 3) if changes["percentage"] is not None else None,
                 "date": datetime.now().strftime("%Y-%m-%d"),
             }
 
@@ -232,16 +230,13 @@ class NotionService:
         except Exception as e:
             logger.error(f"获取投资组合摘要时出错: {e}")
             raise
-    
+
     async def _get_current_portfolio_values(self) -> dict:
         """获取当前投资组合的值"""
         try:
             query = self.client.databases.query(
                 database_id=settings.NOTION_DATABASE_ID,
-                filter={
-                    "property": "资产类型",
-                    "select": {"equals": "cryptocurrency"}
-                }
+                filter={"property": "资产类型", "select": {"equals": "cryptocurrency"}},
             )
 
             portfolio_data = defaultdict(float)
@@ -249,32 +244,28 @@ class NotionService:
 
             for page in query["results"]:
                 properties = page["properties"]
-                symbol = properties.get("Symbol", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "Unknown")
+                symbol = (
+                    properties.get("Symbol", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "Unknown")
+                )
                 holding_value = float(properties.get("Holding Values", {}).get("formula", {}).get("number", 0))
 
                 if holding_value:
                     portfolio_data[symbol] += holding_value
                     current_total += holding_value
 
-            return {
-                'total': current_total,
-                'holdings': dict(portfolio_data)
-            }
+            return {"total": current_total, "holdings": dict(portfolio_data)}
 
         except Exception as e:
             logger.error(f"获取当前投资组合值时出错: {e}")
             raise
-    
+
     async def _get_yesterday_portfolio_data(self) -> dict:
         """获取昨日投资组合数据"""
         try:
             yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
             query = self.client.databases.query(
                 database_id=settings.NOTION_HISTORY_DATABASE_ID,
-                filter={
-                    "property": "Date",
-                    "date": {"equals": yesterday}
-                }
+                filter={"property": "Date", "date": {"equals": yesterday}},
             )
 
             if not query["results"]:
@@ -294,29 +285,23 @@ class NotionService:
                     yesterday_total += holding_value
 
             logger.info(f"昨日数据 - 总值: {yesterday_total}, 持仓: {holdings}")
-            
-            return {
-                'total': yesterday_total,
-                'holdings': holdings
-            }
+
+            return {"total": yesterday_total, "holdings": holdings}
 
         except Exception as e:
             logger.error(f"获取昨日投资组合数据时出错: {e}")
             logger.exception(e)  # 添加详细的错误日志
             raise
-    
+
     def _calculate_portfolio_changes(self, current_total: float, yesterday_total: float) -> dict:
         """计算投资组合的变化"""
         if not yesterday_total:
-            return {'amount': None, 'percentage': None}
+            return {"amount": None, "percentage": None}
 
         change_amount = current_total - yesterday_total
         change_percentage = (change_amount / yesterday_total * 100) if yesterday_total else 0
 
-        return {
-            'amount': change_amount,
-            'percentage': change_percentage
-        }
+        return {"amount": change_amount, "percentage": change_percentage}
 
     async def _update_notion_page(self, page_id, crypto_data):
         """更新 Notion 页面的加密货币数据"""
@@ -327,18 +312,10 @@ class NotionService:
                 "Name": {"title": [{"text": {"content": crypto_data["name"]}}]},
             }
 
-            self.client.pages.update(
-                page_id=page_id,
-                properties=update_properties
-            )
+            self.client.pages.update(page_id=page_id, properties=update_properties)
 
-            logger.info(
-                f"更新主表 - {crypto_data['name']}({crypto_data['symbol']}), "
-                f"价格: ${crypto_data['price']}"
-            )
+            logger.info(f"更新主表 - {crypto_data['name']}({crypto_data['symbol']}), " f"价格: ${crypto_data['price']}")
 
         except Exception as e:
             logger.error(f"更新 Notion 页面时出错: {e}")
             raise
-    
-    

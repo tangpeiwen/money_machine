@@ -15,6 +15,7 @@ notion_service = NotionService()
 crypto_service = CryptoService()
 chart_service = ChartService()
 
+
 @APP.get("/check-and-update")
 async def check_and_update():
     """检查并更新数据库中的加密货币价格"""
@@ -29,9 +30,7 @@ async def check_and_update():
         await notion_service.clear_today_history(today)
 
         # 3. 保存新的历史记录
-        updated_count = await notion_service.save_portfolio_history(
-            crypto_summary, asset_types, today
-        )
+        updated_count = await notion_service.save_portfolio_history(crypto_summary, asset_types, today)
 
         return {"status": "success", "message": f"Updated {updated_count} entries"}
 
@@ -40,6 +39,7 @@ async def check_and_update():
         logger.error(error_msg)
         logger.exception(e)
         raise HTTPException(status_code=500, detail=error_msg)
+
 
 @APP.get("/portfolio-summary")
 async def get_portfolio_data():
@@ -52,6 +52,7 @@ async def get_portfolio_data():
         logger.error(f"获取投资组合数据时出错: {e}")
         logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @APP.get("/portfolio-chart")
 async def generate_portfolio_chart():

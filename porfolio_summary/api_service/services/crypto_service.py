@@ -4,6 +4,7 @@ from typing import Dict, Any
 from api_service.config import settings
 from api_service.utils.logger import logger
 
+
 class CryptoService:
     @staticmethod
     def get_crypto_price(query: str, query_type: str = "symbol") -> Dict[str, Any]:

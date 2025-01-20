@@ -7,59 +7,56 @@ import plotly.express as px
 from api_service.utils.logger import logger
 from api_service.services.notion_service import NotionService
 
+
 class ChartService:
     @staticmethod
     async def create_portfolio_donut(current_data, previous_data=None):
         """创建投资组合环形图，包含与昨日的对比"""
         logger.info(f"current_data: {current_data}")
-        
+
         # 从 current_data 中提取总值，确保是数字类型
         try:
-            total_value = float(current_data.get('total_value', 0))
+            total_value = float(current_data.get("total_value", 0))
         except (TypeError, ValueError):
             logger.error("Invalid total_value in current_data")
             return None
-        
+
         # 如果没有持仓数据，返回空图表
         if total_value == 0:
             logger.warning("No portfolio data available")
             return None
-            
+
         # 获取当前持仓数据
         try:
             # 需要从 NotionService 获取详细的持仓数据
             notion_service = NotionService()
             portfolio_data = await notion_service._get_current_portfolio_values()
-            current_holdings = portfolio_data.get('holdings', {})
-            
+            current_holdings = portfolio_data.get("holdings", {})
+
             # 如果没有持仓数据，返回空图表
             if not current_holdings:
                 logger.warning("No holdings data available")
                 return None
-            
+
             # 获取昨日数据
-            if current_data.get('has_previous_data'):
+            if current_data.get("has_previous_data"):
                 yesterday_data = await notion_service._get_yesterday_portfolio_data()
                 logger.info(f"yesterday: {yesterday_data}")
-                previous_holdings = yesterday_data.get('holdings', {}) if yesterday_data else None
+                previous_holdings = yesterday_data.get("holdings", {}) if yesterday_data else None
             else:
                 previous_holdings = None
-            
+
             # 按价值排序
             portfolio_items = [
-                {
-                    "symbol": symbol,
-                    "value": float(value),  # 确保值是浮点数
-                    "percentage": (float(value) / total_value * 100)
-                }
+                {"symbol": symbol, "value": float(value), "percentage": (float(value) / total_value * 100)}  # 确保值是浮点数
                 for symbol, value in current_holdings.items()
                 if value  # 跳过零值
             ]
-            
+
             if not portfolio_items:
                 logger.warning("No valid portfolio items")
                 return None
-                
+
             portfolio_items.sort(key=lambda x: x["value"], reverse=True)
 
             # 计算与昨日的对比
@@ -80,10 +77,11 @@ class ChartService:
 
             # 创建子图布局
             fig = make_subplots(
-                rows=2, cols=1,
+                rows=2,
+                cols=1,
                 row_heights=[0.65, 0.35],
                 vertical_spacing=0.1,
-                specs=[[{"type": "pie"}], [{"type": "table"}]]
+                specs=[[{"type": "pie"}], [{"type": "table"}]],
             )
 
             # 添加环形图
@@ -170,7 +168,7 @@ class ChartService:
                 width=800,
                 height=1000,
                 showlegend=False,
-                margin=dict(t=60, l=40, r=40, b=20, pad=10)
+                margin=dict(t=60, l=40, r=40, b=20, pad=10),
             )
 
             return fig
