@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS BUILD
+FROM ubuntu:22.04 AS build
 
 ARG CONDA_DIR=/opt/conda
 ARG ENV_DIR=/venv
@@ -10,7 +10,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install miniconda
-ENV PATH $CONDA_DIR/bin:$PATH
+ENV PATH=$CONDA_DIR/bin:$PATH
 RUN wget -q  https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh && \
     echo "export PATH=$CONDA_DIR/bin:PATH" > /etc/profile.d/conda.sh && \
     /bin/bash /tmp/miniforge.sh -b -p $CONDA_DIR && \
@@ -62,7 +62,7 @@ RUN useradd --create-home -s /bin/bash --no-user-group -u $USERID $USERNAME && \
     adduser $USERNAME sudo && \
     echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-ENV PATH $ENV_DIR/bin:$PATH
+ENV PATH=$ENV_DIR/bin:$PATH
 RUN mkdir -p $ENV_DIR && chown -R $USERNAME $ENV_DIR
 COPY --chown=1000 --from=build $ENV_DIR $ENV_DIR
 
@@ -72,5 +72,5 @@ WORKDIR /home/$USERNAME
 COPY --chown=1000 api_service api_service
 COPY --chown=1000 start_server.sh start_server.sh
 
-ENV PORT 8000
+ENV PORT=8000
 CMD ["bash", "start_server.sh"]
