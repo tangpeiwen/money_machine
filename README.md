@@ -19,11 +19,11 @@ pre-commit run --all-files
 Create a new Conda environment using the `environment.yml` file:
 
 ```bash
-mamba env create --name multimodal -f environment.yml
+mamba env create --name web3 -f environment.yml
 ```
 
 Activate the environment:
 
 ```bash
-mamba activate multimodal
+mamba activate web3
 ```

@@ -1,0 +1,23 @@
+name: web3
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - typer
+  - regex
+  - pandas
+  - pyarrow
+  - tenacity
+  - python-dotenv
+  - fastapi
+  - uvicorn
+  - numpy
+  - requests
+  - aiohttp
+  - pip:
+      - types-regex
+      - google-cloud-aiplatform>=1.38
+      - notion-client
+      - plotly
+      - kaleido
