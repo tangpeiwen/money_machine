@@ -81,3 +81,20 @@ async def generate_portfolio_chart():
         logger.error(f"生成投资组合图表时出错: {e}")
         logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@APP.get("/update-single-crypto")
+async def update_single_crypto(url: str):
+    """更新单个加密货币的价格"""
+    try:
+        # 从 URL 中提取 page_id
+        page_id = url.split("-")[-1]  # 获取最后一段
+        
+        result = await notion_service.update_single_crypto_price(page_id)
+        return result
+        
+    except Exception as e:
+        error_msg = f"更新单个加密货币时出错: {str(e)}"
+        logger.error(error_msg)
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=error_msg)

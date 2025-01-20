@@ -36,37 +36,6 @@ class NotionService:
             logger.error(f"更新投资组合价格时出错: {e}")
             raise
 
-    # async def _process_portfolio_item(self, page):
-    #     """处理单个投资组合项目"""
-    #     try:
-    #         properties = page["properties"]
-    #         name, symbol = self._extract_name_symbol(properties)
-    #         asset_type = self._extract_asset_type(properties)
-
-    #         if symbol:
-    #             asset_types = {symbol.upper(): asset_type}
-
-    #         logger.info(f"处理记录 - Name: {name}, Symbol: {symbol}")
-
-    #         crypto_data = await self._get_crypto_data(name, symbol)
-    #         if not crypto_data["success"]:
-    #             return None
-
-    #         # 更新主表
-    #         await self._update_notion_page(page["id"], crypto_data)
-
-    #         # 准备汇总数据
-    #         summary_data = await self._prepare_summary_data(crypto_data, properties)
-
-    #         return {
-    #             'summary': summary_data,
-    #             'asset_types': asset_types
-    #         }
-
-    #     except Exception as e:
-    #         logger.error(f"处理投资组合项目时出错: {e}")
-    #         return None
-
     async def _process_portfolio_item(self, page):
         """处理单个投资组合项目"""
         try:
@@ -319,3 +288,45 @@ class NotionService:
         except Exception as e:
             logger.error(f"更新 Notion 页面时出错: {e}")
             raise
+    
+    async def update_single_crypto_price(self, page_id: str) -> dict:
+        """更新单个加密货币的价格数据"""
+        try:
+            # 获取页面数据
+            page = self.client.pages.retrieve(page_id=page_id)
+            properties = page["properties"]
+            
+            # 提取名称和符号
+            name, symbol = self._extract_name_symbol(properties)
+            logger.info(f"更新单个记录 - Name: {name}, Symbol: {symbol}")
+            
+            # 获取价格数据
+            crypto_data = await self._get_crypto_data(name, symbol)
+            if not crypto_data["success"]:
+                raise Exception(f"无法获取 {name}({symbol}) 的价格数据")
+            
+            # 只更新 Current Price
+            self.client.pages.update(
+                page_id=page_id,
+                properties={
+                    "Current Price": {"number": crypto_data["price"]}
+                }
+            )
+            
+            logger.info(f"更新价格 - {name}({symbol}): ${crypto_data['price']}")
+            
+            return {
+                "status": "success",
+                "data": {
+                    "name": name,
+                    "symbol": symbol,
+                    "current_price": crypto_data["price"]
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"更新单个加密货币价格时出错: {e}")
+            logger.exception(e)
+            raise
+
+    
