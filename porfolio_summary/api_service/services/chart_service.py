@@ -41,7 +41,6 @@ class ChartService:
             # 获取昨日数据
             if current_data.get("has_previous_data"):
                 yesterday_data = await notion_service._get_yesterday_portfolio_data()
-                logger.info(f"yesterday: {yesterday_data}")
                 previous_holdings = yesterday_data.get("holdings", {}) if yesterday_data else None
             else:
                 previous_holdings = None
@@ -52,6 +51,8 @@ class ChartService:
                 for symbol, value in current_holdings.items()
                 if value  # 跳过零值
             ]
+
+            logger.info(f"portfolio_items: {portfolio_items}")
 
             if not portfolio_items:
                 logger.warning("No valid portfolio items")
@@ -72,7 +73,7 @@ class ChartService:
                         item["change_pct"] = 100
 
             # 准备图表数据
-            labels = [f"{item['symbol']}<br>{item['percentage']:.1f}%" for item in portfolio_items]
+            labels = [f"{item['symbol']}<br>{item['percentage']:.2f}%" for item in portfolio_items]
             values = [item["value"] for item in portfolio_items]
 
             # 创建子图布局

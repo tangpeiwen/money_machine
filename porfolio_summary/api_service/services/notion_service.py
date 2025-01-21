@@ -27,7 +27,15 @@ class NotionService:
             for page in query["results"]:
                 result = await self._process_portfolio_item(page)
                 if result:
-                    crypto_summary.update(result["summary"])
+                    # 合并相同 symbol 的数据
+                    for symbol, data in result["summary"].items():
+                        if symbol not in crypto_summary:
+                            crypto_summary[symbol] = data
+                        else:
+                            # 累加持仓数量和总价值
+                            crypto_summary[symbol]["total_tokens"] += data["total_tokens"]
+                            crypto_summary[symbol]["total_value"] += data["total_value"]
+
                     asset_types.update(result["asset_types"])
 
             return crypto_summary, asset_types
@@ -36,18 +44,16 @@ class NotionService:
             logger.error(f"更新投资组合价格时出错: {e}")
             raise
 
-    async def _process_portfolio_item(self, page):
+    async def _process_portfolio_item(self, page) -> dict:
         """处理单个投资组合项目"""
         try:
             properties = page["properties"]
             name, symbol = self._extract_name_symbol(properties)
-            asset_type = self._extract_asset_type(properties)
 
-            if symbol:
-                asset_types = {symbol.upper(): asset_type}
+            # 获取资产类型
+            asset_type = properties.get("资产类型", {}).get("select", {}).get("name", "cryptocurrency")
 
-            logger.info(f"处理记录 - Name: {name}, Symbol: {symbol}")
-
+            # 获取价格数据
             crypto_data = await self._get_crypto_data(name, symbol)
             if not crypto_data["success"]:
                 return None
@@ -59,22 +65,19 @@ class NotionService:
             search_key = crypto_data["symbol"].upper()
             current_price = crypto_data["price"]
             tokens_holding = properties.get("Tokens Holding", {}).get("number", 0)
-            average_cost = properties.get("Cost", {}).get("number", 0)
-            cost_basis = tokens_holding * average_cost if tokens_holding and average_cost else 0
-            total_value = tokens_holding * current_price
 
+            # 返回需要汇总的数据
             return {
                 "summary": {
-                    search_key: {  # 使用 search_key 作为键
+                    search_key: {
                         "name": crypto_data["name"],
                         "symbol": crypto_data["symbol"].upper(),
                         "current_price": current_price,
                         "total_tokens": tokens_holding,
-                        "total_value": total_value,
-                        "total_cost_basis": cost_basis,
+                        "total_value": tokens_holding * current_price,
                     }
                 },
-                "asset_types": asset_types,
+                "asset_types": {search_key: asset_type},
             }
 
         except Exception as e:
@@ -137,9 +140,6 @@ class NotionService:
         for search_key, data in crypto_summary.items():
             if data["total_tokens"] > 0:
                 try:
-                    # 计算加权平均成本
-                    weighted_avg_cost = data["total_cost_basis"] / data["total_tokens"]
-
                     # 使用对应的资产类型
                     asset_type = asset_types.get(search_key, "cryptocurrency")
 
@@ -150,9 +150,7 @@ class NotionService:
                             "Symbol": {"rich_text": [{"text": {"content": data["symbol"]}}]},
                             "资产类型": {"select": {"name": asset_type}},
                             "Current Price": {"number": round(data["current_price"], 8)},
-                            "Tokens Holding": {"number": round(data["total_tokens"], 8)},
-                            "Holding Values": {"number": round(data["total_value"], 4)},
-                            "Cost": {"number": round(weighted_avg_cost, 4)},
+                            "Tokens Holding": {"number": round(data["total_tokens"], 4)},
                         },
                     )
 
@@ -161,7 +159,6 @@ class NotionService:
                         f"成功保存 {search_key} 的汇总数据: "
                         f"总持仓: {data['total_tokens']:.8f}, "
                         f"总价值: ${data['total_value']:.2f}, "
-                        f"加权平均成本: ${weighted_avg_cost:.4f}"
                     )
 
                 except Exception as e:
@@ -288,109 +285,34 @@ class NotionService:
         except Exception as e:
             logger.error(f"更新 Notion 页面时出错: {e}")
             raise
-    
+
     async def update_single_crypto_price(self, page_id: str) -> dict:
         """更新单个加密货币的价格数据"""
         try:
             # 获取页面数据
             page = self.client.pages.retrieve(page_id=page_id)
             properties = page["properties"]
-            
+
             # 提取名称和符号
             name, symbol = self._extract_name_symbol(properties)
             logger.info(f"更新单个记录 - Name: {name}, Symbol: {symbol}")
-            
+
             # 获取价格数据
             crypto_data = await self._get_crypto_data(name, symbol)
             if not crypto_data["success"]:
                 raise Exception(f"无法获取 {name}({symbol}) 的价格数据")
-            
+
             # 只更新 Current Price
-            self.client.pages.update(
-                page_id=page_id,
-                properties={
-                    "Current Price": {"number": crypto_data["price"]}
-                }
-            )
-            
+            self.client.pages.update(page_id=page_id, properties={"Current Price": {"number": crypto_data["price"]}})
+
             logger.info(f"更新价格 - {name}({symbol}): ${crypto_data['price']}")
-            
+
             return {
                 "status": "success",
-                "data": {
-                    "name": name,
-                    "symbol": symbol,
-                    "current_price": crypto_data["price"]
-                }
+                "data": {"name": name, "symbol": symbol, "current_price": crypto_data["price"]},
             }
-            
+
         except Exception as e:
             logger.error(f"更新单个加密货币价格时出错: {e}")
             logger.exception(e)
             raise
-
-    async def update_new_crypto_records(self) -> list:
-        """检查并更新新添加的加密货币记录"""
-        try:
-            # 查询最近添加的加密货币记录
-            query = self.client.databases.query(
-                database_id=settings.NOTION_DATABASE_ID,
-                filter={
-                    "and": [
-                        {
-                            "property": "资产类型",
-                            "select": {
-                                "equals": "cryptocurrency"
-                            }
-                        },
-                        {
-                            "property": "Current Price",
-                            "number": {
-                                "is_empty": True
-                            }
-                        }
-                    ]
-                }
-            )
-
-            updated_records = []
-            for page in query["results"]:
-                try:
-                    # 提取名称和符号
-                    name, symbol = self._extract_name_symbol(page["properties"])
-                    
-                    # 获取价格数据
-                    crypto_data = await self._get_crypto_data(name, symbol)
-                    if not crypto_data["success"]:
-                        continue
-                    
-                    # 更新所有相关字段
-                    self.client.pages.update(
-                        page_id=page["id"],
-                        properties={
-                            "Current Price": {"number": crypto_data["price"]},
-                            "Symbol": {"rich_text": [{"text": {"content": crypto_data["symbol"]}}]},
-                            "Name": {"title": [{"text": {"content": crypto_data["name"]}}]}
-                        }
-                    )
-                    
-                    updated_records.append({
-                        "name": crypto_data["name"],  # 使用获取到的标准名称
-                        "symbol": crypto_data["symbol"],  # 使用获取到的标准符号
-                        "price": crypto_data["price"]
-                    })
-                    
-                    logger.info(f"更新新记录 - {crypto_data['name']}({crypto_data['symbol']}): ${crypto_data['price']}")
-                    
-                except Exception as e:
-                    logger.error(f"更新记录时出错: {str(e)}")
-                    continue
-            
-            return updated_records
-            
-        except Exception as e:
-            logger.error(f"检查新记录时出错: {e}")
-            logger.exception(e)
-            raise
-
-    

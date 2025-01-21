@@ -1,10 +1,9 @@
 from io import BytesIO
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 
-from api_service.config import settings
 from api_service.services.notion_service import NotionService
 from api_service.services.crypto_service import CryptoService
 from api_service.services.chart_service import ChartService
@@ -89,13 +88,13 @@ async def check_new_records():
     try:
         # 获取并更新新记录
         updated_records = await notion_service.update_new_crypto_records()
-        
+
         return {
             "status": "success",
             "message": f"Checked and updated {len(updated_records)} new records",
-            "updated_records": updated_records
+            "updated_records": updated_records,
         }
-        
+
     except Exception as e:
         error_msg = f"检查新记录时出错: {str(e)}"
         logger.error(error_msg)
@@ -115,30 +114,3 @@ async def update_single_crypto(url: str):
         logger.error(error_msg)
         logger.exception(e)
         raise HTTPException(status_code=500, detail=error_msg)
-
-# @APP.post("/notion-webhook")
-# async def notion_webhook(request: Request):
-#     """处理 Make 的 webhook 回调"""
-#     try:
-#         # 获取 webhook 数据
-#         data = await request.json()
-#         logger.info(f"收到 webhook 请求: {data}")
-        
-#         # 如果是 webhook 验证请求
-#         if data.get("type") == "url_verification":
-#             return {"challenge": data.get("challenge")}
-            
-#         # 获取更新的页面 URL
-#         url = data.get("event", {}).get("page", {}).get("url")
-#         if not url:
-#             raise HTTPException(status_code=400, detail="Missing page URL")
-            
-#         # 更新价格
-#         result = await notion_service.update_single_crypto_price(url.split("-")[-1])
-#         return result
-        
-#     except Exception as e:
-#         error_msg = f"处理 webhook 时出错: {str(e)}"
-#         logger.error(error_msg)
-#         logger.exception(e)
-#         raise HTTPException(status_code=500, detail=error_msg)
