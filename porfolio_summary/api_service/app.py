@@ -83,45 +83,62 @@ async def generate_portfolio_chart():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@APP.get("/check-new-records")
+async def check_new_records():
+    """检查并更新新添加的加密货币记录"""
+    try:
+        # 获取并更新新记录
+        updated_records = await notion_service.update_new_crypto_records()
+        
+        return {
+            "status": "success",
+            "message": f"Checked and updated {len(updated_records)} new records",
+            "updated_records": updated_records
+        }
+        
+    except Exception as e:
+        error_msg = f"检查新记录时出错: {str(e)}"
+        logger.error(error_msg)
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 @APP.get("/update-single-crypto")
 async def update_single_crypto(url: str):
     """更新单个加密货币的价格"""
     try:
-        # 从 URL 中提取 page_id
-        page_id = url.split("-")[-1]  # 获取最后一段
-        
+        page_id = url.split("-")[-1]
         result = await notion_service.update_single_crypto_price(page_id)
         return result
-        
     except Exception as e:
         error_msg = f"更新单个加密货币时出错: {str(e)}"
         logger.error(error_msg)
         logger.exception(e)
         raise HTTPException(status_code=500, detail=error_msg)
 
-@APP.post("/notion-webhook")
-async def notion_webhook(request: Request):
-    """处理 Make 的 webhook 回调"""
-    try:
-        # 获取 webhook 数据
-        data = await request.json()
-        logger.info(f"收到 webhook 请求: {data}")
+# @APP.post("/notion-webhook")
+# async def notion_webhook(request: Request):
+#     """处理 Make 的 webhook 回调"""
+#     try:
+#         # 获取 webhook 数据
+#         data = await request.json()
+#         logger.info(f"收到 webhook 请求: {data}")
         
-        # 如果是 webhook 验证请求
-        if data.get("type") == "url_verification":
-            return {"challenge": data.get("challenge")}
+#         # 如果是 webhook 验证请求
+#         if data.get("type") == "url_verification":
+#             return {"challenge": data.get("challenge")}
             
-        # 获取更新的页面 URL
-        url = data.get("event", {}).get("page", {}).get("url")
-        if not url:
-            raise HTTPException(status_code=400, detail="Missing page URL")
+#         # 获取更新的页面 URL
+#         url = data.get("event", {}).get("page", {}).get("url")
+#         if not url:
+#             raise HTTPException(status_code=400, detail="Missing page URL")
             
-        # 更新价格
-        result = await notion_service.update_single_crypto_price(url.split("-")[-1])
-        return result
+#         # 更新价格
+#         result = await notion_service.update_single_crypto_price(url.split("-")[-1])
+#         return result
         
-    except Exception as e:
-        error_msg = f"处理 webhook 时出错: {str(e)}"
-        logger.error(error_msg)
-        logger.exception(e)
-        raise HTTPException(status_code=500, detail=error_msg)
+#     except Exception as e:
+#         error_msg = f"处理 webhook 时出错: {str(e)}"
+#         logger.error(error_msg)
+#         logger.exception(e)
+#         raise HTTPException(status_code=500, detail=error_msg)

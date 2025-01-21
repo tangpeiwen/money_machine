@@ -329,4 +329,68 @@ class NotionService:
             logger.exception(e)
             raise
 
+    async def update_new_crypto_records(self) -> list:
+        """检查并更新新添加的加密货币记录"""
+        try:
+            # 查询最近添加的加密货币记录
+            query = self.client.databases.query(
+                database_id=settings.NOTION_DATABASE_ID,
+                filter={
+                    "and": [
+                        {
+                            "property": "资产类型",
+                            "select": {
+                                "equals": "cryptocurrency"
+                            }
+                        },
+                        {
+                            "property": "Current Price",
+                            "number": {
+                                "is_empty": True
+                            }
+                        }
+                    ]
+                }
+            )
+
+            updated_records = []
+            for page in query["results"]:
+                try:
+                    # 提取名称和符号
+                    name, symbol = self._extract_name_symbol(page["properties"])
+                    
+                    # 获取价格数据
+                    crypto_data = await self._get_crypto_data(name, symbol)
+                    if not crypto_data["success"]:
+                        continue
+                    
+                    # 更新所有相关字段
+                    self.client.pages.update(
+                        page_id=page["id"],
+                        properties={
+                            "Current Price": {"number": crypto_data["price"]},
+                            "Symbol": {"rich_text": [{"text": {"content": crypto_data["symbol"]}}]},
+                            "Name": {"title": [{"text": {"content": crypto_data["name"]}}]}
+                        }
+                    )
+                    
+                    updated_records.append({
+                        "name": crypto_data["name"],  # 使用获取到的标准名称
+                        "symbol": crypto_data["symbol"],  # 使用获取到的标准符号
+                        "price": crypto_data["price"]
+                    })
+                    
+                    logger.info(f"更新新记录 - {crypto_data['name']}({crypto_data['symbol']}): ${crypto_data['price']}")
+                    
+                except Exception as e:
+                    logger.error(f"更新记录时出错: {str(e)}")
+                    continue
+            
+            return updated_records
+            
+        except Exception as e:
+            logger.error(f"检查新记录时出错: {e}")
+            logger.exception(e)
+            raise
+
     
