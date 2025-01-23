@@ -10,7 +10,7 @@ from api_service.services.chart_service import ChartService
 from api_service.services.dex_service import DexService
 from api_service.utils.logger import logger
 from api_service.config import settings
-from api_service.services.pie_chart_service import PieChartService
+
 
 APP = FastAPI()
 notion_service = NotionService()
