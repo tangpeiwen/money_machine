@@ -177,10 +177,10 @@ class ChartService:
             fig.add_annotation(
                 text=f"<b>Total Value</b><br>${total_value:,.2f}",
                 x=0.5,
-                y=0.71,
+                y=0.72,
                 xref="paper",
                 yref="paper",
-                font=dict(size=16),
+                font=dict(size=18),
                 showarrow=False,
                 xanchor="center",
                 yanchor="middle",
