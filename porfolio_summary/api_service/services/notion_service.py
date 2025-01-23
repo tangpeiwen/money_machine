@@ -234,7 +234,6 @@ class NotionService:
             )
 
             portfolio_data = defaultdict(float)
-            asset_types = {}  # 添加资产类型字典
             current_total = 0
 
             for page in query["results"]:
@@ -243,14 +242,12 @@ class NotionService:
                     properties.get("Symbol", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "Unknown")
                 )
                 holding_value = float(properties.get("Holding Values", {}).get("formula", {}).get("number", 0))
-                asset_type = properties.get("资产类型", {}).get("select", {}).get("name", "cryptocurrency")  # 获取资产类型
 
                 if holding_value:
                     portfolio_data[symbol] += holding_value
                     current_total += holding_value
-                    asset_types[symbol] = asset_type  # 记录资产类型
 
-            return {"total": current_total, "holdings": dict(portfolio_data), "asset_types": asset_types}  # 返回资产类型信息
+            return {"total": current_total, "holdings": dict(portfolio_data)}
 
         except Exception as e:
             logger.error(f"获取当前投资组合值时出错: {e}")

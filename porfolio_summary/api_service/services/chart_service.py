@@ -32,26 +32,11 @@ class ChartService:
             notion_service = NotionService()
             portfolio_data = await notion_service._get_current_portfolio_values()
             current_holdings = portfolio_data.get("holdings", {})
-            asset_types = portfolio_data.get("asset_types", {})  # 获取资产类型信息
-            logger.info(f"portfolio_data: {portfolio_data}")
 
             # 如果没有持仓数据，返回空图表
             if not current_holdings:
                 logger.warning("No holdings data available")
                 return None
-
-            # 合并 altcoin 数据
-            merged_holdings = {}
-            altcoin_total = 0
-
-            for symbol, value in current_holdings.items():
-                if asset_types.get(symbol) == "altcoin":
-                    altcoin_total += float(value)
-                else:
-                    merged_holdings[symbol] = value
-
-            if altcoin_total > 0:
-                merged_holdings["Altcoins"] = altcoin_total
 
             # 获取昨日数据
             if current_data.get("has_previous_data"):
@@ -60,11 +45,11 @@ class ChartService:
             else:
                 previous_holdings = None
 
-            # 按价值排序
+            # 按价值排序，只包含占比大于1%的币种
             portfolio_items = [
                 {"symbol": symbol, "value": float(value), "percentage": (float(value) / total_value * 100)}
-                for symbol, value in merged_holdings.items()
-                if value  # 跳过零值
+                for symbol, value in current_holdings.items()
+                if value and (float(value) / total_value * 100) >= 0.5  # 只保留占比大于1%的币种
             ]
 
             logger.info(f"portfolio_items: {portfolio_items}")
@@ -73,27 +58,15 @@ class ChartService:
                 logger.warning("No valid portfolio items")
                 return None
 
+            # 按价值排序
             portfolio_items.sort(key=lambda x: x["value"], reverse=True)
 
             # 计算与昨日的对比
             if previous_holdings:
-                # 合并昨日的 altcoin 数据
-                merged_previous = {}
-                prev_altcoin_total = 0
-
-                for symbol, value in previous_holdings.items():
-                    if asset_types.get(symbol) == "altcoin":
-                        prev_altcoin_total += float(value)
-                    else:
-                        merged_previous[symbol] = value
-
-                if prev_altcoin_total > 0:
-                    merged_previous["Altcoins"] = prev_altcoin_total
-
                 for item in portfolio_items:
                     symbol = item["symbol"]
-                    if symbol in merged_previous:
-                        prev_value = merged_previous[symbol]
+                    if symbol in previous_holdings:
+                        prev_value = previous_holdings[symbol]
                         item["change"] = item["value"] - prev_value
                         item["change_pct"] = ((item["value"] / prev_value) - 1) * 100 if prev_value else 0
                     else:
@@ -117,7 +90,7 @@ class ChartService:
                 rows=2,
                 cols=1,
                 row_heights=[0.6, 0.4],  # 调整比例
-                vertical_spacing=0.2,
+                vertical_spacing=0.1,
                 specs=[[{"type": "pie"}], [{"type": "table"}]],
             )
 
@@ -192,7 +165,7 @@ class ChartService:
                     "x": 0.5,
                     "xanchor": "center",
                     "yanchor": "top",
-                    "font": dict(size=16),
+                    "font": dict(size=18),
                 },
                 width=1000,  # 增加宽度
                 height=1200,  # 增加高度
@@ -204,7 +177,7 @@ class ChartService:
             fig.add_annotation(
                 text=f"<b>Total Value</b><br>${total_value:,.2f}",
                 x=0.5,
-                y=0.7,
+                y=0.71,
                 xref="paper",
                 yref="paper",
                 font=dict(size=16),
