@@ -203,3 +203,156 @@ class ChartService:
         except Exception as e:
             logger.error(f"Error creating portfolio donut chart: {e}")
             return None
+
+    @staticmethod
+    async def create_portfolio_waterfall(current_data, previous_data=None):
+        """创建投资组合瀑布图，展示每个币种的日变化"""
+        logger.info("Creating portfolio waterfall chart")
+
+        try:
+            notion_service = NotionService()
+
+            # 获取当前持仓数据
+            portfolio_data = await notion_service._get_current_portfolio_values()
+            current_holdings = portfolio_data.get("holdings", {})
+
+            # 获取昨日数据
+            yesterday_data = await notion_service._get_yesterday_portfolio_data()
+            previous_holdings = yesterday_data.get("holdings", {}) if yesterday_data else {}
+
+            if not current_holdings or not previous_holdings:
+                logger.warning("Insufficient data for waterfall chart")
+                return None
+
+            # 计算每个币种的变化
+            changes = []
+            for symbol in set(current_holdings.keys()) | set(previous_holdings.keys()):
+                current_value = float(current_holdings.get(symbol, 0))
+                previous_value = float(previous_holdings.get(symbol, 0))
+                change = current_value - previous_value
+
+                if abs(change) >= 1:  # 只显示变化超过1美元的币种
+                    changes.append(
+                        {
+                            "symbol": symbol,
+                            "change": change,
+                            "previous_value": previous_value,
+                            "current_value": current_value,
+                            "pct_change": (change / previous_value * 100) if previous_value != 0 else 0,
+                        }
+                    )
+
+            # 按变化绝对值排序
+            changes.sort(key=lambda x: abs(x["change"]), reverse=True)
+
+            # 准备图表数据
+            symbols = [item["symbol"] for item in changes]
+            values = [item["change"] for item in changes]
+
+            # 使用更柔和的颜色
+            colors = ["rgba(0, 176, 80, 0.7)" if v >= 0 else "rgba(255, 44, 44, 0.7)" for v in values]
+
+            # 创建瀑布图
+            fig = go.Figure()
+
+            # 添加零线
+            fig.add_hline(y=0, line=dict(color="rgba(128, 128, 128, 0.3)", width=1, dash="dash"), layer="below")
+
+            # 添加柱状图
+            fig.add_trace(
+                go.Bar(
+                    name="Change",
+                    x=symbols,
+                    y=values,
+                    marker=dict(
+                        color=colors,
+                        line=dict(
+                            color=["rgba(0, 140, 64, 1)" if v >= 0 else "rgba(204, 35, 35, 1)" for v in values],
+                            width=0.5,
+                        ),
+                    ),
+                    text=[f"${v:+,.2f}<br>{p:+.1f}%" for v, p in zip(values, [item["pct_change"] for item in changes])],
+                    textposition="outside",
+                    textfont=dict(
+                        size=10, color=["rgba(0, 140, 64, 1)" if v >= 0 else "rgba(204, 35, 35, 1)" for v in values]
+                    ),
+                    hovertemplate=(
+                        "<b>%{x}</b><br>"
+                        + "Change: $%{y:,.2f}<br>"
+                        + "Previous: $%{customdata[0]:,.2f}<br>"
+                        + "Current: $%{customdata[1]:,.2f}<br>"
+                        + "Change: %{customdata[2]:+.1f}%<br>"
+                        + "<extra></extra>"
+                    ),
+                    customdata=[
+                        [item["previous_value"], item["current_value"], item["pct_change"]] for item in changes
+                    ],
+                )
+            )
+
+            # 更新布局
+            fig.update_layout(
+                title={
+                    "text": (
+                        f"24h Portfolio Changes by Asset<br>"
+                        f"<span style='font-size:14px;color:gray'>{datetime.now().strftime('%Y-%m-%d')}</span>"
+                    ),
+                    "y": 0.95,
+                    "x": 0.5,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                    "font": dict(size=20, color="#2F4F4F"),
+                },
+                width=1200,
+                height=700,
+                showlegend=False,
+                plot_bgcolor="rgba(248,248,248,0.3)",
+                paper_bgcolor="white",
+                yaxis=dict(
+                    title="Change in USD",
+                    titlefont=dict(size=14, color="#666666"),
+                    gridcolor="rgba(128,128,128,0.1)",
+                    zerolinecolor="rgba(128,128,128,0.2)",
+                    zerolinewidth=1,
+                ),
+                xaxis=dict(
+                    title="Assets",
+                    titlefont=dict(size=14, color="#666666"),
+                    tickangle=0,
+                    tickfont=dict(size=12),
+                ),
+                bargap=0.4,
+                margin=dict(t=120, l=80, r=80, b=40),
+            )
+
+            # 添加总变化注释
+            total_change = sum(values)
+            total_previous = sum(item["previous_value"] for item in changes)
+            total_pct_change = (total_change / total_previous * 100) if total_previous != 0 else 0
+
+            change_color = "rgba(0, 140, 64, 1)" if total_change >= 0 else "rgba(204, 35, 35, 1)"
+
+            fig.add_annotation(
+                text=(
+                    f"Total Change: <span style='color:{change_color}'>"
+                    f"${total_change:+,.2f} ({total_pct_change:+.1f}%)</span>"
+                ),
+                x=0.5,
+                y=1,
+                xref="paper",
+                yref="paper",
+                font=dict(size=16),
+                showarrow=False,
+                xanchor="center",
+                yanchor="bottom",
+            )
+
+            # 添加背景网格
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="rgba(128,128,128,0.1)")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="rgba(128,128,128,0.1)")
+
+            return fig
+
+        except Exception as e:
+            logger.error(f"Error creating portfolio waterfall chart: {e}")
+            return None

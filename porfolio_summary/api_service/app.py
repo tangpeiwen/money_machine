@@ -7,7 +7,8 @@ from fastapi.responses import Response
 from api_service.services.notion_service import NotionService
 from api_service.services.crypto_service import CryptoService
 from api_service.services.chart_service import ChartService
-from api_service.services.dex_service import DexService
+
+# from api_service.services.dex_service import DexService
 from api_service.utils.logger import logger
 from api_service.config import settings
 
@@ -16,7 +17,7 @@ APP = FastAPI()
 notion_service = NotionService()
 crypto_service = CryptoService()
 chart_service = ChartService()
-dex_service = DexService()
+# dex_service = DexService()
 
 
 @APP.get("/check-and-update")
@@ -137,3 +138,32 @@ async def update_single_crypto():
         logger.error(error_msg)
         logger.exception(e)
         raise HTTPException(status_code=500, detail=error_msg)
+
+
+@APP.get("/portfolio-waterfall")
+async def generate_portfolio_waterfall():
+    """生成投资组合瀑布图，展示每个币种的日变化"""
+    try:
+        # 获取投资组合摘要数据
+        current_data = await notion_service.get_portfolio_summary()
+
+        if not current_data:
+            raise HTTPException(status_code=404, detail="No portfolio data found")
+
+        # 创建瀑布图
+        fig = await chart_service.create_portfolio_waterfall(current_data)
+
+        if fig is None:
+            raise HTTPException(status_code=404, detail="Failed to create waterfall chart")
+
+        # 转换为图片
+        img_bytes = BytesIO()
+        fig.write_image(img_bytes, format="png")
+        img_bytes.seek(0)
+
+        return Response(content=img_bytes.getvalue(), media_type="image/png")
+
+    except Exception as e:
+        logger.error(f"生成投资组合瀑布图时出错: {e}")
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=str(e))
