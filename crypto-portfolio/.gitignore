@@ -1,0 +1,57 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# VS Code Local History
+.history/
+.history/*
+*/.history/
+**/.history/
+.vscode/history/
+
+# VS Code Local History - 具体路径
+backend/app/api/v1/endpoints/*_20*.py
+backend/app/api/v1/endpoints/assets_20*.py
+backend/app/api/v1/endpoints/history_20*.py
+backend/app/api/v1/endpoints/portfolio_20*.py
+
+# VS Code Local History - 通用规则
+**/*_20[0-9][0-9][0-9][0-9][0-9][0-9]*.py
