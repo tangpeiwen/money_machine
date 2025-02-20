@@ -1,7 +1,13 @@
 import requests
 from typing import Optional, Dict
+
+# import aiohttp
+import logging
+
 from ..core.config import settings
-import aiohttp
+
+
+logger = logging.getLogger(__name__)
 
 
 class PriceService:
@@ -13,7 +19,7 @@ class PriceService:
         Returns:
             dict: 包含名称、价格等信息的字典，如果获取失败则返回 None
         """
-        url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+        url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
         params = {"symbol": symbol.upper(), "convert": "USD"}
         headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": settings.CMC_API_KEY}
 
@@ -22,11 +28,15 @@ class PriceService:
             data = response.json()
 
             if "data" in data and data["data"]:
-                crypto_data = data["data"][symbol.upper()]
+                crypto_data = data["data"][symbol.upper()][0]
                 return {
                     "name": crypto_data["name"],
                     "symbol": crypto_data["symbol"],
                     "price": crypto_data["quote"]["USD"]["price"],
+                    # "daily_change_percentage": crypto_data["quote"]["USD"]["percent_change_24h"],
+                    "percent_change_1h": crypto_data["quote"]["USD"]["percent_change_1h"],
+                    "percent_change_24h": crypto_data["quote"]["USD"]["percent_change_24h"],
+                    "percent_change_7d": crypto_data["quote"]["USD"]["percent_change_7d"],
                 }
 
         except Exception as e:
@@ -55,7 +65,7 @@ class PriceService:
         Returns:
             dict: 包含名称、价格等信息的字典，如果获取失败则返回 None
         """
-        url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+        url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
         params = {"symbol": symbol.upper(), "convert": "USD"}
         headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": settings.CMC_API_KEY}
 
@@ -64,11 +74,14 @@ class PriceService:
             data = response.json()
 
             if "data" in data and data["data"]:
-                crypto_data = data["data"][symbol.upper()]
+                crypto_data = data["data"][symbol.upper()][0]
                 return {
                     "name": crypto_data["name"],
                     "symbol": crypto_data["symbol"],
                     "price": crypto_data["quote"]["USD"]["price"],
+                    "percent_change_1h": crypto_data["quote"]["USD"]["percent_change_1h"],
+                    "percent_change_24h": crypto_data["quote"]["USD"]["percent_change_24h"],
+                    "percent_change_7d": crypto_data["quote"]["USD"]["percent_change_7d"],
                 }
 
         except Exception as e:
@@ -80,30 +93,31 @@ class PriceService:
     async def get_daily_change(symbol: str) -> float:
         """获取加密货币的24小时价格变化百分比"""
         try:
-            from ..core.database import db
+            # from ..core.database import db
 
-            supabase = db.get_supabase_client()
+            # supabase = db.get_supabase_client()
 
-            # 获取最近两天的历史数据
-            result = (
-                supabase.table("portfolio_history")
-                .select("*")
-                .eq("symbol", symbol.upper())
-                .order("date", desc=True)
-                .limit(2)
-                .execute()
-            )
+            # # 获取最近两天的历史数据
+            # result = (
+            #     supabase.table("portfolio_history")
+            #     .select("*")
+            #     .eq("symbol", symbol.upper())
+            #     .order("date", desc=True)
+            #     .limit(2)
+            #     .execute()
+            # )
+            # logger.info(f"Result: {result}")
 
-            if len(result.data) >= 2:
-                current_price = result.data[0]["current_price"]
-                previous_price = result.data[1]["current_price"]
+            # if len(result.data) >= 2:
+            #     current_price = result.data[0]["current_price"]
+            #     previous_price = result.data[1]["current_price"]
 
-                if previous_price > 0:
-                    percent_change = ((current_price - previous_price) / previous_price) * 100
-                    return round(percent_change, 2)
+            #     if previous_price > 0:
+            #         percent_change = ((current_price - previous_price) / previous_price) * 100
+            #         return round(percent_change, 2)
 
             # 如果没有足够的历史数据，尝试使用 CoinMarketCap API
-            url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+            url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
             params = {"symbol": symbol.upper(), "convert": "USD"}
             headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": settings.CMC_API_KEY}
 
@@ -111,7 +125,7 @@ class PriceService:
             data = response.json()
 
             if "data" in data and data["data"]:
-                crypto_data = data["data"][symbol.upper()]
+                crypto_data = data["data"][symbol.upper()][0]
                 return round(crypto_data["quote"]["USD"]["percent_change_24h"], 2)
 
             return 0

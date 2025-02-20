@@ -11,6 +11,7 @@ class AssetBase(BaseModel):
     token_address: Optional[str] = Field(None, description="代币地址")
     asset_type: str = Field(default="cryptocurrency", description="资产类型")
     storage: Optional[str] = Field(None, description="存储位置")
+    percent_change_24h: float = Field(default=0.0, description="24小时价格变化百分比")
 
 
 # 创建资产请求
@@ -29,6 +30,7 @@ class AssetResponse(AssetBase):
     current_price: float = Field(default=0.0, description="当前价格")
     tokens_holding: float = Field(default=0.0, description="持有数量")
     holding_value: float = Field(default=0.0, description="持仓价值")
+    percent_change_24h: float = Field(default=0.0, description="24小时价格变化百分比")
 
     class Config:
         from_attributes = True

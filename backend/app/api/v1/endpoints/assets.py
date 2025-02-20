@@ -1,8 +1,12 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
-from ....schemas.asset import AssetCreate, AssetUpdate, AssetResponse
+from ....schemas.asset import AssetCreate, AssetUpdate, AssetResponse, AssetInDB
 from ....services.asset import AssetService
 from ....core.utils import TEMP_USER_ID
+import logging
+
+# 设置日志记录器
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -64,17 +68,29 @@ async def update_asset_by_symbol(
     return asset
 
 
-@router.put("/{asset_id}", response_model=AssetResponse)
-async def update_asset(
-    asset_id: str,
-    asset_update: AssetUpdate,
-    user_id: str = TEMP_USER_ID,  # 使用固定的 UUID
-):
-    """更新资产信息"""
-    asset = await AssetService.update_asset(user_id, asset_id, asset_update)
-    if not asset:
-        raise HTTPException(status_code=404, detail="Asset not found")
-    return asset
+@router.put("/update")
+async def update_asset(asset_update: AssetUpdate, user_id: str = TEMP_USER_ID):
+    """更新资产数量"""
+    try:
+        logger.info(f"Received update request - asset_update: {asset_update.model_dump()}")  # 打印完整的请求数据
+        logger.info(f"Request body tokens_holding: {asset_update.tokens_holding}")  # 打印 tokens_holding 值
+
+        updated_asset = await AssetService.update_asset_by_symbol_and_storage(
+            user_id=user_id,
+            symbol=asset_update.symbol,
+            storage=asset_update.storage,
+            asset_update=asset_update,  # 直接传递 asset_update 对象
+        )
+
+        if not updated_asset:
+            logger.error(f"Asset not found: {asset_update}")
+            raise HTTPException(status_code=404, detail="Asset not found")
+
+        logger.info(f"Asset updated successfully: {updated_asset.model_dump()}")  # 打印更新后的数据
+        return updated_asset
+    except Exception as e:
+        logger.error(f"Error updating asset: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{asset_id}")

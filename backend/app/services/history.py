@@ -9,12 +9,7 @@ from .price import PriceService
 class HistoryService:
     @staticmethod
     async def record_portfolio_snapshot(user_id: str) -> bool:
-        """记录投资组合快照
-        Args:
-            user_id: 用户ID，必需
-        Returns:
-            bool: 是否成功记录快照
-        """
+        """记录投资组合快照，每个日期每个币种只保留最新记录"""
         supabase = db.get_supabase_client()
 
         # 获取资产数据
@@ -22,36 +17,40 @@ class HistoryService:
         assets = result.data if result.data else []
 
         # 按币种汇总数据
-        symbol_totals = defaultdict(lambda: {"tokens_holding": 0, "holding_value": 0})
+        symbol_totals = defaultdict(
+            lambda: {"tokens_holding": 0, "holding_value": 0, "percent_change_24h": 0}  # 初始化涨跌幅
+        )
 
         for asset in assets:
             symbol_totals[asset["symbol"]]["tokens_holding"] += asset["tokens_holding"]
             symbol_totals[asset["symbol"]]["holding_value"] += asset["holding_value"]
-            # 保存最新的价格（因为同一币种价格应该相同）
+            # 保存最新的价格和其他数据（因为同一币种这些数据应该相同）
             symbol_totals[asset["symbol"]]["current_price"] = asset["current_price"]
             symbol_totals[asset["symbol"]]["asset_type"] = asset["asset_type"]
+            symbol_totals[asset["symbol"]]["percent_change_24h"] = asset["percent_change_24h"]  # 保存涨跌幅
 
-        # 创建历史记录
-        history_records = []
-        current_time = datetime.utcnow().isoformat()
-
+        # 创建或更新历史记录
         for symbol, totals in symbol_totals.items():
-            history_records.append(
-                {
-                    "user_id": user_id,
-                    "symbol": symbol,
-                    "asset_type": totals["asset_type"],
-                    "current_price": totals["current_price"],
-                    "tokens_holding": totals["tokens_holding"],
-                    "holding_value": totals["holding_value"],
-                    "date": current_time,
-                }
+            # 使用 upsert 操作，基于 user_id, symbol 和 date 的组合
+            result = (
+                supabase.table("portfolio_history")
+                .upsert(
+                    {
+                        "user_id": user_id,
+                        "symbol": symbol,
+                        "asset_type": totals["asset_type"],
+                        "current_price": totals["current_price"],
+                        "tokens_holding": totals["tokens_holding"],
+                        "holding_value": totals["holding_value"],
+                        "percent_change_24h": totals["percent_change_24h"],
+                        "date": datetime.utcnow().date().isoformat(),  # 只使用日期部分
+                    },
+                    on_conflict="user_id,symbol,date",  # 基于唯一约束
+                )
+                .execute()
             )
 
-        if history_records:
-            result = supabase.table("portfolio_history").insert(history_records).execute()
-            return bool(result.data)
-        return False
+        return True
 
     @staticmethod
     async def get_portfolio_history(
@@ -154,12 +153,12 @@ class HistoryService:
 
         # 计算总体变化
         value_change_24h = total_value - old_total_value
-        percent_change_24h = (value_change_24h / old_total_value * 100) if old_total_value > 0 else 0
+        # percent_change_24h = (value_change_24h / old_total_value * 100) if old_total_value > 0 else 0
 
         return {
             "total_value": total_value,
             "value_change_24h": value_change_24h,
-            "percent_change_24h": percent_change_24h,
+            # "percent_change_24h": percent_change_24h,
             "asset_count": len(current_totals),
             "last_updated": datetime.utcnow().isoformat(),
             "symbol_changes": symbol_changes,

@@ -18,6 +18,7 @@ class AssetCreate(BaseModel):
 
 
 class AssetUpdate(BaseModel):
+    symbol: str = Field(..., description="资产代号")
     tokens_holding: Optional[float] = Field(None, ge=0, description="持有数量")
     storage: Optional[str] = Field(None, description="存储位置")
 
@@ -29,6 +30,7 @@ class AssetInDB(AssetBase):
     current_price: float = Field(default=0.0)
     tokens_holding: float = Field(default=0.0)
     holding_value: float = Field(default=0.0)
+    percent_change_24h: float = Field(default=0.0, description="24小时价格变化百分比")
     created_at: datetime
     updated_at: datetime
 

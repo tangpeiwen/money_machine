@@ -1,9 +1,15 @@
 from typing import List, Optional
+import logging
+
 from ..core.database import db
 from ..schemas.portfolio import AssetCreate, AssetUpdate, PortfolioResponse
 from .price import PriceService
 from datetime import datetime
 from .history import HistoryService
+from .asset import AssetService
+
+# 设置日志记录器
+logger = logging.getLogger(__name__)
 
 
 class PortfolioService:
@@ -42,7 +48,7 @@ class PortfolioService:
         assets_with_data = []
         for asset in assets_result.data:
             # 获取每个加密货币的24小时价格变化
-            daily_change = await PriceService.get_daily_change(asset.get("symbol"))
+            # daily_change = await PriceService.get_daily_change(asset.get("symbol"))
 
             assets_with_data.append(
                 {
@@ -50,9 +56,10 @@ class PortfolioService:
                     "symbol": asset.get("symbol"),
                     "amount": asset.get("tokens_holding"),
                     "value": asset.get("holding_value", 0),
-                    "dailyChange": daily_change,
+                    "dailyChange": asset.get("percent_change_24h", 0),  # 直接使用存储的涨跌幅,
                 }
             )
+            logger.info(f"Processed asset data: {assets_with_data}")
 
         return PortfolioResponse(
             user_id=user_id, assets=assets_with_data, total_value=total_value, last_updated=latest_date
@@ -68,8 +75,10 @@ class PortfolioService:
         """添加新资产到投资组合"""
         supabase = db.get_supabase_client()
 
-        # 获取当前价格和计算价值
-        current_price = await PriceService.get_crypto_price(asset.symbol) or 0
+        # 获取当前价格、涨跌幅和计算价值
+        crypto_info = await AssetService.get_crypto_info(asset.symbol)
+        current_price = crypto_info["price"] if crypto_info else 0
+        percent_change_24h = crypto_info["percent_change_24h"] if crypto_info else 0
         holding_value = current_price * asset.tokens_holding
 
         # 1. 添加到 assets 表
@@ -78,6 +87,7 @@ class PortfolioService:
             **asset.model_dump(),
             "current_price": current_price,
             "holding_value": holding_value,
+            "percent_change_24h": percent_change_24h,  # 添加涨跌幅
         }
         supabase.table("assets").insert(asset_data).execute()
 
@@ -99,10 +109,14 @@ class PortfolioService:
         for asset in assets_result.data:
             symbol = asset["symbol"]
             if symbol not in symbol_totals:
-                symbol_totals[symbol] = {"tokens_holding": 0, "current_price": asset["current_price"]}
+                symbol_totals[symbol] = {
+                    "tokens_holding": 0,
+                    "current_price": asset["current_price"],
+                    "percent_change_24h": asset["percent_change_24h"],  # 添加涨跌幅
+                }
             symbol_totals[symbol]["tokens_holding"] += asset["tokens_holding"]
 
-        # 3. 插入新的历史记录，确保正确计算 holding_value
+        # 3. 插入新的历史记录
         history_records = []
         for symbol, data in symbol_totals.items():
             tokens_holding = data["tokens_holding"]
@@ -113,7 +127,8 @@ class PortfolioService:
                     "symbol": symbol,
                     "tokens_holding": tokens_holding,
                     "current_price": current_price,
-                    "holding_value": current_price * tokens_holding,  # 确保正确计算
+                    "holding_value": current_price * tokens_holding,
+                    "percent_change_24h": data["percent_change_24h"],  # 添加涨跌幅
                     "date": datetime.now().isoformat(),
                 }
             )
@@ -126,8 +141,10 @@ class PortfolioService:
         """更新资产信息"""
         supabase = db.get_supabase_client()
 
-        # 获取当前价格
-        current_price = await PriceService.get_current_price(symbol)
+        # 获取当前价格和涨跌幅
+        crypto_info = await AssetService.get_crypto_info(symbol)
+        current_price = crypto_info["price"] if crypto_info else 0
+        percent_change_24h = crypto_info["percent_change_24h"] if crypto_info else 0
 
         # 计算新的持仓价值
         holding_value = current_price * asset_update.amount
@@ -142,6 +159,7 @@ class PortfolioService:
                     "current_price": current_price,
                     "tokens_holding": asset_update.amount,
                     "holding_value": holding_value,
+                    "percent_change_24h": percent_change_24h,  # 添加涨跌幅
                     "date": datetime.now().isoformat(),
                 }
             )

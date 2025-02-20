@@ -51,5 +51,5 @@ async def get_asset_history(
 
 @router.get("/stats")
 async def get_portfolio_stats(user_id: str = TEMP_USER_ID):
-    """获取投资组合统计数据"""
+    """获取投资组合统计数据，包括每个资产的24小时变化"""
     return await HistoryService.calculate_portfolio_stats(user_id)
