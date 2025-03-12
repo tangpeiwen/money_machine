@@ -11,27 +11,44 @@ class HistoryService:
     async def record_portfolio_snapshot(user_id: str) -> bool:
         """记录投资组合快照，每个日期每个币种只保留最新记录"""
         supabase = db.get_supabase_client()
+        today = datetime.utcnow().date().isoformat()
 
         # 获取资产数据
         result = supabase.table("assets").select("*").eq("user_id", user_id).execute()
         assets = result.data if result.data else []
 
         # 按币种汇总数据
-        symbol_totals = defaultdict(
-            lambda: {"tokens_holding": 0, "holding_value": 0, "percent_change_24h": 0}  # 初始化涨跌幅
-        )
+        symbol_totals = defaultdict(lambda: {"tokens_holding": 0, "holding_value": 0, "percent_change_24h": 0})
+
+        # 记录当前拥有的所有币种
+        current_symbols = set()
 
         for asset in assets:
-            symbol_totals[asset["symbol"]]["tokens_holding"] += asset["tokens_holding"]
-            symbol_totals[asset["symbol"]]["holding_value"] += asset["holding_value"]
-            # 保存最新的价格和其他数据（因为同一币种这些数据应该相同）
-            symbol_totals[asset["symbol"]]["current_price"] = asset["current_price"]
-            symbol_totals[asset["symbol"]]["asset_type"] = asset["asset_type"]
-            symbol_totals[asset["symbol"]]["percent_change_24h"] = asset["percent_change_24h"]  # 保存涨跌幅
+            symbol = asset["symbol"]
+            current_symbols.add(symbol)
+            symbol_totals[symbol]["tokens_holding"] += asset["tokens_holding"]
+            symbol_totals[symbol]["holding_value"] += asset["holding_value"]
+            symbol_totals[symbol]["current_price"] = asset["current_price"]
+            symbol_totals[symbol]["asset_type"] = asset["asset_type"]
+            symbol_totals[symbol]["percent_change_24h"] = asset["percent_change_24h"]
+            symbol_totals[symbol]["logo_url"] = asset["logo_url"]
 
-        # 创建或更新历史记录
+        # 1. 先删除今天已经不存在的资产记录
+        existing_result = (
+            supabase.table("portfolio_history").select("symbol").eq("user_id", user_id).eq("date", today).execute()
+        )
+
+        if existing_result.data:
+            existing_symbols = {record["symbol"] for record in existing_result.data}
+            symbols_to_delete = existing_symbols - current_symbols
+
+            if symbols_to_delete:
+                supabase.table("portfolio_history").delete().eq("user_id", user_id).eq("date", today).in_(
+                    "symbol", list(symbols_to_delete)
+                ).execute()
+
+        # 2. 更新或插入当前资产记录
         for symbol, totals in symbol_totals.items():
-            # 使用 upsert 操作，基于 user_id, symbol 和 date 的组合
             result = (
                 supabase.table("portfolio_history")
                 .upsert(
@@ -43,9 +60,10 @@ class HistoryService:
                         "tokens_holding": totals["tokens_holding"],
                         "holding_value": totals["holding_value"],
                         "percent_change_24h": totals["percent_change_24h"],
-                        "date": datetime.utcnow().date().isoformat(),  # 只使用日期部分
+                        "logo_url": totals["logo_url"],
+                        "date": today,
                     },
-                    on_conflict="user_id,symbol,date",  # 基于唯一约束
+                    on_conflict="user_id,symbol,date",
                 )
                 .execute()
             )

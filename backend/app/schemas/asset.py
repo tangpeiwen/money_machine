@@ -7,14 +7,22 @@ class AssetBase(BaseModel):
     symbol: str = Field(..., description="资产代号")
     chain: Optional[str] = Field(None, description="区块链网络")
     token_address: Optional[str] = Field(None, description="代币地址")
-    asset_type: str = Field(default="cryptocurrency", description="资产类型")
+    asset_type: Optional[str] = Field(default="cryptocurrency", description="资产类型")
     storage: Optional[str] = Field(None, description="存储位置")
+    logo_url: Optional[str] = Field(None, description="Logo URL")
 
 
 class AssetCreate(BaseModel):
     symbol: str = Field(..., description="资产代号")
     storage: Optional[str] = Field(None, description="存储位置")
     tokens_holding: float = Field(..., ge=0, description="持有数量")
+    asset_type: Optional[str] = Field(default="cryptocurrency", description="资产类型")
+    chain: Optional[str] = Field(None, description="区块链网络")
+    token_address: Optional[str] = Field(None, description="代币地址")
+    logo_url: Optional[str] = Field(None, description="Logo URL")
+    notes: Optional[str] = Field(None, description="用户笔记")
+    purchase_price: Optional[float] = Field(None, description="购买价格")
+    created_at: datetime = Field(default=datetime.utcnow().isoformat(), description="创建时间")
 
 
 class AssetUpdate(BaseModel):
@@ -31,8 +39,11 @@ class AssetInDB(AssetBase):
     tokens_holding: float = Field(default=0.0)
     holding_value: float = Field(default=0.0)
     percent_change_24h: float = Field(default=0.0, description="24小时价格变化百分比")
-    created_at: datetime
-    updated_at: datetime
+    logo_url: Optional[str] = Field(None, description="Logo URL")
+    created_at: datetime = Field(default=datetime.utcnow().isoformat(), description="创建时间")
+    updated_at: Optional[datetime] = Field(None, description="更新时间")
+    notes: Optional[str] = Field(None, description="用户笔记")
+    purchase_price: Optional[float] = Field(None, description="购买价格")
 
     model_config = ConfigDict(from_attributes=True)
 

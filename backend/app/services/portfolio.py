@@ -1,12 +1,12 @@
-from typing import List, Optional
+from typing import Optional, Dict, List, Any
 import logging
 
 from ..core.database import db
 from ..schemas.portfolio import AssetCreate, AssetUpdate, PortfolioResponse
-from .price import PriceService
 from datetime import datetime
 from .history import HistoryService
 from .asset import AssetService
+from ..core.utils import get_crypto_logo
 
 # 设置日志记录器
 logger = logging.getLogger(__name__)
@@ -56,7 +56,8 @@ class PortfolioService:
                     "symbol": asset.get("symbol"),
                     "amount": asset.get("tokens_holding"),
                     "value": asset.get("holding_value", 0),
-                    "dailyChange": asset.get("percent_change_24h", 0),  # 直接使用存储的涨跌幅,
+                    "percent_change_24h": asset.get("percent_change_24h", 0),  # 确保这个字段存在
+                    "logo_url": asset.get("logo_url"),  # 添加 logo_url 字段
                 }
             )
             logger.info(f"Processed asset data: {assets_with_data}")
@@ -88,6 +89,7 @@ class PortfolioService:
             "current_price": current_price,
             "holding_value": holding_value,
             "percent_change_24h": percent_change_24h,  # 添加涨跌幅
+            "logo_url": await get_crypto_logo(asset.symbol),  # 添加 logo_url
         }
         supabase.table("assets").insert(asset_data).execute()
 
@@ -160,6 +162,7 @@ class PortfolioService:
                     "tokens_holding": asset_update.amount,
                     "holding_value": holding_value,
                     "percent_change_24h": percent_change_24h,  # 添加涨跌幅
+                    "logo_url": await get_crypto_logo(symbol),  # 添加 logo_url
                     "date": datetime.now().isoformat(),
                 }
             )

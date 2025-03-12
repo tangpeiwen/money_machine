@@ -19,6 +19,17 @@ class PriceService:
         Returns:
             dict: 包含名称、价格等信息的字典，如果获取失败则返回 None
         """
+        # Special handling for USDT - always return $1 with 0% change
+        if symbol.upper() == "USDT":
+            return {
+                "name": "Tether",
+                "symbol": "USDT",
+                "price": 1.0,
+                "percent_change_1h": 0.0,
+                "percent_change_24h": 0.0,
+                "percent_change_7d": 0.0,
+            }
+
         url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
         params = {"symbol": symbol.upper(), "convert": "USD"}
         headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": settings.CMC_API_KEY}
@@ -33,7 +44,6 @@ class PriceService:
                     "name": crypto_data["name"],
                     "symbol": crypto_data["symbol"],
                     "price": crypto_data["quote"]["USD"]["price"],
-                    # "daily_change_percentage": crypto_data["quote"]["USD"]["percent_change_24h"],
                     "percent_change_1h": crypto_data["quote"]["USD"]["percent_change_1h"],
                     "percent_change_24h": crypto_data["quote"]["USD"]["percent_change_24h"],
                     "percent_change_7d": crypto_data["quote"]["USD"]["percent_change_7d"],
@@ -55,68 +65,14 @@ class PriceService:
         info = await PriceService.get_crypto_info(symbol)
         return info["price"] if info else None
 
-
-class PriceService:
-    @staticmethod
-    async def get_crypto_info(symbol: str) -> Optional[Dict]:
-        """获取加密货币详细信息
-        Args:
-            symbol: 加密货币代号（如 BTC, ETH）
-        Returns:
-            dict: 包含名称、价格等信息的字典，如果获取失败则返回 None
-        """
-        url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
-        params = {"symbol": symbol.upper(), "convert": "USD"}
-        headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": settings.CMC_API_KEY}
-
-        try:
-            response = requests.get(url, headers=headers, params=params)
-            data = response.json()
-
-            if "data" in data and data["data"]:
-                crypto_data = data["data"][symbol.upper()][0]
-                return {
-                    "name": crypto_data["name"],
-                    "symbol": crypto_data["symbol"],
-                    "price": crypto_data["quote"]["USD"]["price"],
-                    "percent_change_1h": crypto_data["quote"]["USD"]["percent_change_1h"],
-                    "percent_change_24h": crypto_data["quote"]["USD"]["percent_change_24h"],
-                    "percent_change_7d": crypto_data["quote"]["USD"]["percent_change_7d"],
-                }
-
-        except Exception as e:
-            print(f"获取价格时出错: {str(e)}")  # TODO: 使用proper日志记录
-
-        return None
-
     @staticmethod
     async def get_daily_change(symbol: str) -> float:
         """获取加密货币的24小时价格变化百分比"""
+        # Special handling for USDT - always return 0% change
+        if symbol.upper() == "USDT":
+            return 0.0
+
         try:
-            # from ..core.database import db
-
-            # supabase = db.get_supabase_client()
-
-            # # 获取最近两天的历史数据
-            # result = (
-            #     supabase.table("portfolio_history")
-            #     .select("*")
-            #     .eq("symbol", symbol.upper())
-            #     .order("date", desc=True)
-            #     .limit(2)
-            #     .execute()
-            # )
-            # logger.info(f"Result: {result}")
-
-            # if len(result.data) >= 2:
-            #     current_price = result.data[0]["current_price"]
-            #     previous_price = result.data[1]["current_price"]
-
-            #     if previous_price > 0:
-            #         percent_change = ((current_price - previous_price) / previous_price) * 100
-            #         return round(percent_change, 2)
-
-            # 如果没有足够的历史数据，尝试使用 CoinMarketCap API
             url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
             params = {"symbol": symbol.upper(), "convert": "USD"}
             headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": settings.CMC_API_KEY}
