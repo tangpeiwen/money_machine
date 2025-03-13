@@ -8,6 +8,8 @@ from ....core.database import db
 from ....services.price import PriceService
 from ....services.cryptocurrency import CryptocurrencyService
 from ....services.dex import DexService
+from datetime import datetime
+from uuid import UUID
 
 # 设置日志记录器
 logger = logging.getLogger(__name__)
@@ -95,14 +97,43 @@ async def get_top_cryptos(
         raise HTTPException(status_code=500, detail="Failed to fetch top cryptocurrencies")
 
 
+@router.get("/last-updated", response_model=Dict)
+async def get_last_updated_time(
+    user_id: str = Query(..., description="User ID from authentication"),
+):
+    """获取用户资产数据最后更新时间"""
+    try:
+        # 从数据库中获取用户资产的最后更新时间
+        supabase = db.get_supabase_client()
+
+        # 查询用户资产表，获取最新的更新时间
+        result = (
+            supabase.table("assets")
+            .select("updated_at")
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        if result.data and len(result.data) > 0:
+            # 返回最新的更新时间
+            return {"last_updated": result.data[0]["updated_at"], "status": "success"}
+        else:
+            # 如果没有资产，返回当前时间
+            return {"last_updated": datetime.now().isoformat(), "status": "no_assets"}
+    except Exception as e:
+        logger.error(f"Error getting last updated time for user {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get last updated time")
+
+
 @router.get("/{asset_id}", response_model=AssetResponse)
 async def get_asset(
-    asset_id: str,
-    # user_id: str = TEMP_USER_ID,  # 使用固定的 UUID
+    asset_id: UUID,
     user_id: str = Query(..., description="User ID from authentication"),
 ):
     """获取单个资产详情"""
-    asset = await AssetService.get_asset(user_id, asset_id)
+    asset = await AssetService.get_asset(user_id, str(asset_id))
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     return asset
