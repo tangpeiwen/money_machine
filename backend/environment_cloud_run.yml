@@ -11,6 +11,7 @@ dependencies:
   - uvicorn
   - openai
   - requests
+  - pillow
   - pip:
     - python-dotenv
     - supabase>=1.0.3
