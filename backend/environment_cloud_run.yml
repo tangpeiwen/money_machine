@@ -19,3 +19,4 @@ dependencies:
     - python-okx
     - python-bitget
     - pydantic_settings
+    - python-multipart
