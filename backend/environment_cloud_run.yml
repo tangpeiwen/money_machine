@@ -11,10 +11,10 @@ dependencies:
   - uvicorn
   - openai
   - requests
-  - pydantic_settings
   - pip:
     - python-dotenv
     - supabase>=1.0.3
     - python-binance
     - python-okx
     - python-bitget
+    - pydantic_settings
