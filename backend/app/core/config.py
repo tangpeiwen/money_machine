@@ -18,7 +18,6 @@ class Settings(BaseSettings):
 
     # 外部API配置
     CMC_API_KEY: str
-    COINAPI_API_KEY: str  # CoinAPI 密钥，从 .env 加载
     BINANCE_API_KEY: str
     BINANCE_API_SECRET: str
 
