@@ -19,12 +19,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 # 配置CORS
+
+origins = [
+    "http://localhost:3000",  # Your local frontend
+    " https://moneymachine-production.up.railway.app",  # Your production frontend domain
+    # Add any other domains that need access
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
 
 # 注册 API 路由
