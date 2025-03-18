@@ -10,7 +10,7 @@ from ....core.utils import TEMP_USER_ID
 router = APIRouter()
 
 
-@router.get("/", response_model=PortfolioResponse)
+@router.get("", response_model=PortfolioResponse)
 async def get_portfolio(
     # user_id: str = TEMP_USER_ID,  # 使用固定的 UUID
     user_id: str = Query(..., description="User ID from authentication"),
